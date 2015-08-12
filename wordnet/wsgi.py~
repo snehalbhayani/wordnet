@@ -16,12 +16,15 @@ framework.
 import os
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "wordnet.settings")
-os.environ.setdefault('DJANGO_CONFIGURATION', 'Wordnet_snippets')
+
 # This application object is used by any WSGI server configured to use this
 # file. This includes Django's development server, if the WSGI_APPLICATION
 # setting points here.
-from configurations.wsgi import get_wsgi_application
-application = get_wsgi_application()
+#from django.core.wsgi import get_wsgi_application
+#application = get_wsgi_application()
+def application(env, start_response):
+    start_response('200 OK', [('Content-Type', 'text/html')])
+    return ["Hello!"]
 
 # Apply WSGI middleware here.
 # from helloworld.wsgi import HelloWorldApplication
