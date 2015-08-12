@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.3.14/angular.min.js"></script>
+<body>
+
+    <form action="/lookup/" method=post  >
+      {% csrf_token %}
+      {{form}}
+    </form>
+ <ul class=entries>
+
+  </ul>
+  
+  </body>
+</html>
