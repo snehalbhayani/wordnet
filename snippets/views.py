@@ -12,6 +12,8 @@ from collections import OrderedDict
 import traceback
 import sys,inspect
 import staticpaths
+from pywsd.similarity import max_similarity as maxsim
+import nltk
 
 
 class HelpViewSet(viewsets.ViewSet):
@@ -45,9 +47,11 @@ class LookupWordRelationViewSet(viewsets.ViewSet):
 
     @api_marker_decorator
     @list_route(methods=['get'])
-    def find_similarity(self,request,arg1=None,arg2=None,arg3=None):
-        start_word=arg1
-        end_word=arg2
+    def find_similarity(self,request):
+        words=str(request.GET['words']).split(',')
+        start_word=words[0]
+        end_word=words[1]
+        arg3=request.GET['relationstouse']
         rels_to_use=None
         if arg3 is not None and str(arg3) == "all" :
             rels_to_use='*'
@@ -106,10 +110,11 @@ class LookupWordViewSet(viewsets.ViewSet):
     """
     @api_marker_decorator    
     @list_route(methods=['get'])
-    def group_by_relation(self, request,arg1=None,arg2=None):
-        word=arg1
-        rels=arg2
+    def group_by_relation(self, request):
+
         if request.method=='GET':
+            word=request.GET['word']
+            rels=request.GET['lookup']            
             rels_list=rels.split('_')
             if len(rels_list) ==0:
                 print ('No relations specified')
@@ -128,10 +133,10 @@ class LookupWordViewSet(viewsets.ViewSet):
 
     @api_marker_decorator
     @list_route(methods=['get'])
-    def group_by_definition(self, request,arg1=None,arg2=None):
-        word=arg1
-        rels=arg2
+    def group_by_definition(self, request):
         if request.method=='GET':
+            word=request.GET['word']
+            rels=request.GET['lookup']        
             rels_list=rels.split('_')
             if len(rels_list) ==0:
                 print ('No relations specified')
@@ -150,6 +155,10 @@ class LookupWordViewSet(viewsets.ViewSet):
     @staticmethod
     def get_pronunciation_url(word):
         return str(staticpaths.URL_FOR_PRONUNICATION_FILES)+word+'.mp3'
+
+    @staticmethod
+    def get_corpus_for_examples():
+        return str(staticpaths.CORPUS_FOR_EXAMPLES)
         
     @staticmethod
     def find_and_group_by_relation(word,relation):
@@ -228,9 +237,14 @@ class LookupWordViewSet(viewsets.ViewSet):
 
     @api_marker_decorator    
     @list_route(methods=['get'])
-    def find_examples(self, request,arg1=None,arg2=None):
-        word=arg1
-        definition=arg2
+    def find_examples(self, request):
+        word=request.GET['word']
+        definition=request.GET['definition']       
+        package='nltk.corpus'
+        corpus=LookupWordViewSet.get_corpus_for_examples()
+        imported = getattr(__import__(package, fromlist=[corpus]), corpus)
+        sentences=imported.sents()
+        #The above is a list of sentences available in the corpus.
         if word ==None:
             return Response('Some problem with the parameters pass with GET request')
         else:
@@ -249,6 +263,19 @@ class LookupWordViewSet(viewsets.ViewSet):
                     if end_word not in examples[definition]:
                         examples[definition][end_word]=set()
                     examples[definition][end_word].add(synonym.properties['example'])
+            for sentence in sentences:
+                if word in sentence:
+                    text=' '.join(sentence)
+                    ambiguous=word
+                    synset=maxsim(text,ambiguous)
+                    context=synset.definition()
+                    if context not in examples:
+                        examples[context]={}
+                    if word not in examples[context]:
+                        examples[context][word]=set()
+                    if len(examples[context][word])>=3:
+                        continue                        
+                    examples[context][word].add(text)
         else:
             print('Http method not supported in this version.')
         return Response(examples)
