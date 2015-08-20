@@ -238,24 +238,33 @@ class LookupWordViewSet(viewsets.ViewSet):
     @api_marker_decorator    
     @list_route(methods=['get'])
     def find_examples(self, request):
-        word=request.GET['word']
-        definition=request.GET['definition']       
-        package='nltk.corpus'
-        corpus=LookupWordViewSet.get_corpus_for_examples()
-        imported = getattr(__import__(package, fromlist=[corpus]), corpus)
-        sentences=imported.sents()
-        #The above is a list of sentences available in the corpus.
+        query_parameters=request.GET
+        print query_parameters
+        word=query_parameters.getlist('word')[0]
+        definition=None
+        corpus_for_examples=None
+        print query_parameters.getlist('corpus_to_use')[0]
+        try:
+            corpus_for_examples=query_parameters.getlist('corpus_to_use')[0]
+        except :
+            print('Corpus_for_example not specified.')
+        try:
+            definition=query_parameters.getlist('definition')[0]
+        except :
+            print('Definition not specified.')
+
+
         if word ==None:
             return Response('Some problem with the parameters pass with GET request')
         else:
             graph=LookupWordViewSet.connect_to_neo()
-        if request.method=='GET':
+        try:
             examples={}
             q=r"match (n {name:'"+word.replace("'","\\\'")+"'})-[r:synonym]->(m) return r,m "
             results=graph.cypher.execute(q)
             for result in results:
                 synonym=result[0]
-                definition=result[0].properties['definition']
+                definition=synonym.properties['definition']
                 if synonym.properties['example']:
                     end_word=result[1].properties['name']    
                     if definition not in examples:
@@ -263,20 +272,15 @@ class LookupWordViewSet(viewsets.ViewSet):
                     if end_word not in examples[definition]:
                         examples[definition][end_word]=set()
                     examples[definition][end_word].add(synonym.properties['example'])
-            for sentence in sentences:
-                if word in sentence:
-                    text=' '.join(sentence)
-                    ambiguous=word
-                    synset=maxsim(text,ambiguous)
-                    context=synset.definition()
-                    if context not in examples:
-                        examples[context]={}
-                    if word not in examples[context]:
-                        examples[context][word]=set()
-                    if len(examples[context][word])>=3:
-                        continue                        
-                    examples[context][word].add(text)
-        else:
+                if corpus_for_examples is not None and synonym.properties[str(corpus_for_examples)+'_examples']:
+                    end_word=result[1].properties['name']    
+                    if definition not in examples:
+                        examples[definition]={}                
+                    if end_word not in examples[definition]:
+                        examples[definition][end_word]=set()
+                    examples[definition][end_word]=examples[definition][end_word].union(synonym.properties[str(corpus_for_examples)+'_examples'])
+        except :
+            print(traceback.format_exc())            
             print('Http method not supported in this version.')
         return Response(examples)
 
