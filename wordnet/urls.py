@@ -3,6 +3,7 @@ from django.conf.urls import patterns, include, url
 from lookupword import views
 from django.contrib import admin
 import snippets
+import activities
 admin.autodiscover()
 
 urlpatterns = patterns('',
@@ -12,4 +13,5 @@ urlpatterns = patterns('',
     url(r'^form/', views.WordView),
     url(r'^lookup/', views.LookupWord),
     url(r'^', include('snippets.urls')),
+    url(r'^', include('activities.urls')),
 )
