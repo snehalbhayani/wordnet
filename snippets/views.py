@@ -16,14 +16,16 @@ import staticpaths
 from pywsd.similarity import max_similarity as maxsim
 import nltk
 from pywsd import disambiguate
+import logging
+logger = logging.getLogger(__name__)
 class HelpViewSet(viewsets.ViewSet):
     
     @list_route(methods=['get'])
     def list_apis(self,request):
-        print __name__
+        logger.info( __name__)
         classes = inspect.getmembers(sys.modules[__name__], inspect.isclass)
         apis=None
-        print dir(sys.modules[__name__])
+        logger.info( dir(sys.modules[__name__]))
         
         for aclass in classes:
             if aclass[1].__module__ != __name__:
@@ -54,9 +56,6 @@ class LookupWordRelationViewSet(viewsets.ViewSet):
                    2.  <relationstouse> specifies the relations which are to be used for finding the relation of the second word with respect to the first word. Multiple relation types are specified by using the underscore character as the concatenating character. For example, to look for relations between the two words using only synonyms and antonyms, we need to specify the value of relationstouse as 'synonym_antonym'. If we want to use all of the available relation types for finding the relation between the two words, we specify the value of relationstouse as 'all'. Any of the relation types specified in the first API can be used for finding the relation between the two words. 
 
         """
-        server=LookupWordViewSet.get_neo_server()
-        LookupWordViewSet.start_neo('/home/snehal/data/sensegraph.db',server)     
-        graph=LookupWordViewSet.connect_to_neo()
         words=str(request.GET['words']).split(',')
         start_word=words[0]
         end_word=words[1]
@@ -67,27 +66,24 @@ class LookupWordRelationViewSet(viewsets.ViewSet):
         elif arg3 is not None and str(arg3) != "" :
             rels_to_use=":"+arg3.replace('_','|:')+"*"
         if start_word ==None or end_word==None:
-            print("Please specify both the words.")
+            logger.info("Please specify both the words.")
             return False
         paths=[]
         if request.method=='GET':
             graph=LookupWordViewSet.connect_to_neo()
             if rels_to_use is not None :
-                q=r"match (n:word {name:'"+start_word+"'}), (m:word {name:'"+end_word+"'}),(n)-[r1:synonym]->(k1:sense), (m)-[r2:synonym]->(k2:sense), p=shortestPath((k1)-[r"+rels_to_use+"]-(k2)) with nodes(p) as pnodes, k1 , k2 return k1,pnodes,k2 limit 2"
+                q=r"match (n {name:'"+start_word+"'}), (m {name:'"+end_word+"'}), p=allShortestPaths((n)-["+rels_to_use+"]->(m)) return relationships(p)"
             else:
-                print('Problem with the valdity of the input parameters. Please contact the programmer.')
-            print q
+                logger.info('Problem with the valdity of the input parameters. Please contact the programmer.')
+            logger.info (q)
             results=graph.cypher.execute(q)
-            print results
             for result in results:
                 path={}
-                start_sense=result[0]
-                end_sense=result[2]
-                path_nodes=result[1]
-                if len(path_nodes) >0:
+                relations=result[0]
+                if len(relations) >0:
                     path['start_word']=start_word
                     path['end_word']=end_word                
-                for node in path_nodes:
+                for relation in relations:
                     if 'subpaths' not in path:
                         path['subpaths']=[]    
                     r=OrderedDict({})
@@ -103,7 +99,7 @@ class LookupWordRelationViewSet(viewsets.ViewSet):
                     path['subpaths'].append(r)
                 paths.append(path)
         return Response(paths)
-    
+
 
         
 
@@ -113,7 +109,7 @@ class LookupWordRelationViewSet(viewsets.ViewSet):
             graph= Graph("http://"+settings.NEO4J_DATABASES['default']['USER']+":"+settings.NEO4J_DATABASES['default']['PASSWORD']+"@"+settings.NEO4J_DATABASES['default']['HOST']+":"+str(settings.NEO4J_DATABASES['default']['PORT'])+settings.NEO4J_DATABASES['default']['ENDPOINT'])
             return graph
         except:
-            print(traceback.format_exc())    
+            logger.error(traceback.format_exc())    
             return False
 
 class LookupWordViewSet(viewsets.ViewSet):
@@ -134,7 +130,7 @@ class LookupWordViewSet(viewsets.ViewSet):
             rels=request.GET['lookup']            
             rels_list=rels.split('_')
             if len(rels_list) ==0:
-                print ('No relations specified')
+                logger.info ('No relations specified')
             elif rels != 'all':
                 construction=""
                 for rel in rels_list:
@@ -143,9 +139,9 @@ class LookupWordViewSet(viewsets.ViewSet):
             else:
                 dict_of_details=(LookupWordViewSet.find_and_group_by_relation(word,''))
             wordcard = WordCard(word=word,dictdetails=dict_of_details)
-            print dict_of_details
+            logger.info (dict_of_details)
         else:
-            print('Http method not supported in this version.')
+            logger.error('Http method not supported in this version.')
         return Response(dict_of_details)
 
     @api_marker_decorator
@@ -163,7 +159,7 @@ class LookupWordViewSet(viewsets.ViewSet):
             rels=request.GET['lookup']        
             rels_list=rels.split('_')
             if len(rels_list) ==0:
-                print ('No relations specified')
+                logger.warn ('No relations specified')
             elif rels != 'all':
                 construction=""
                 for rel in rels_list:
@@ -173,7 +169,7 @@ class LookupWordViewSet(viewsets.ViewSet):
                 dict_of_details=(LookupWordViewSet.find_and_group_by_definition(word,''))
                 wordcard = WordCard(word=word,dictdetails=dict_of_details)
         else:
-            print('Http method not supported in this version.')
+            logger.error('Http method not supported in this version.')
         return Response(dict_of_details)
 
     @staticmethod
@@ -204,11 +200,14 @@ class LookupWordViewSet(viewsets.ViewSet):
             if node.properties['name'] == word:
                 continue
             definition=relationship.properties['definition']
+            if definition is None:
+                continue
             if relationship_type not in edge_senses.keys():
                 edge_senses[relationship_type]={}
             if definition not in edge_senses[relationship_type].keys():
-                edge_senses[relationship_type][definition]=[]
-            edge_senses[relationship_type][definition].append([node.properties['name'],relationship.properties['pos']])
+                edge_senses[relationship_type][definition]={'words':[],'part_of_speech':''}                
+            edge_senses[relationship_type][definition]['words'].append(node.properties['name'])
+            edge_senses[relationship_type][definition]['part_of_speech']=relationship.properties['pos']
         return edge_senses
         
     @staticmethod
@@ -232,11 +231,14 @@ class LookupWordViewSet(viewsets.ViewSet):
             if node.properties['name'] == word:
                 continue
             definition=relationship.properties['definition']
+            if definition is None:
+                continue            
             if definition not in edge_senses.keys():
                 edge_senses[definition]={}
             if relationship_type not in edge_senses[definition].keys():
-                edge_senses[definition][relationship_type]=[]
-            edge_senses[definition][relationship_type].append([node.properties['name'],relationship.properties['pos']])
+                edge_senses[definition][relationship_type]={'words':[],'part_of_speech':''}
+            edge_senses[definition][relationship_type]['words'].append(node.properties['name'])
+            edge_senses[definition][relationship_type]['part_of_speech']=relationship.properties['pos']           
         return edge_senses
     
 
@@ -248,18 +250,18 @@ class LookupWordViewSet(viewsets.ViewSet):
         if request.method=='GET':
             rels_list=rels.split('_')
             if len(rels_list) ==0:
-                print ('No relations specified')
+                logger.warn ('No relations specified')
             else:
                 construction=""
                 for rel in rels_list:
                     construction=construction+":"+rel+'|'
                 dict_of_details=(LookupWordViewSet.find_and_group_by_relation(word,construction[:-1]))
                 wordcard = WordCard(word=word,dictdetails=dict_of_details)
-                print wordcard.dictdetails
+                logger.info (wordcard.dictdetails)
 #                renderedjson = JSONRenderer().render(serializer.data)
-            print dict_of_details
+            logger.info (dict_of_details)
         else:
-            print('Http method not supported in this version.')
+            logger.error('Http method not supported in this version.')
         return Response(dict_of_details)
         
 
@@ -274,28 +276,29 @@ class LookupWordViewSet(viewsets.ViewSet):
                    3.   <definition> is an optional parameter which is used to seek examples which have the specified word used in only a particular sense. TODO.
         """
         query_parameters=request.GET
-        print query_parameters
+        logger.info( query_parameters)
         word=query_parameters.getlist('word')[0]
         definition=None
         corpus_for_examples=None
         try:
             corpus_for_examples=query_parameters.getlist('corpus_to_use')[0]
         except :
-            print('Corpus_for_example not specified.')
+            logger.error('Corpus_for_example not specified.')
         try:
             definition=query_parameters.getlist('definition')[0]
         except :
-            print('Definition not specified.')
+            logger.info('Definition not specified.')
 
 
         if word ==None:
             return Response('Some problem with the parameters pass with GET request')
         else:
             try:
+                server=LookupWordViewSet.get_neo_server()
+                LookupWordViewSet.start_neo('/home/snehal/data/graphwithoutexamples.db',server)     
                 graph=LookupWordViewSet.connect_to_neo()
             except:
-                LookupWordViewSet.start_neo('/home/snehal/data/examplesentencesgraph.db',server)
-                
+                return Response('Some problem with starting/restarting of the neo4j server.')                
         try:
             examples={}
             q=r"match (n {name:'"+word.replace("'","\\\'")+"'})-[r:synonym]->(m) return r,m "
@@ -318,8 +321,8 @@ class LookupWordViewSet(viewsets.ViewSet):
                         examples[definition][end_word]=set()
                     examples[definition][end_word]=examples[definition][end_word].union(synonym.properties[str(corpus_for_examples)+'_examples'])
         except :
-            print(traceback.format_exc())            
-            print('Http method not supported in this version.')
+            logger.error(traceback.format_exc())            
+            logger.error('Http method not supported in this version.')
         return Response(examples)
 
 
@@ -329,30 +332,31 @@ class LookupWordViewSet(viewsets.ViewSet):
             server = GraphServer(staticpaths.NEO4J_SERVER_DIST_PATH)
             return server
         except:
-            print(traceback.format_exc())    
-            print('Could not find and initialize the neo4j server')    
+            logger.error(traceback.format_exc())    
+            logger.error('Could not find and initialize the neo4j server')    
             return False
 
 
     @staticmethod
     def start_neo(db_dump_location='graph.db',server=None):
-        print str(server.pid) + ' PIDDDDDDDDD '
+        logger.info (str(server.pid) + ' PIDDDDDDDDD ')
         if server.pid is None:
             try:
+                server.update_server_properties(database_location=db_dump_location)
                 server.start()
             except:
-                print('Some issue in server start.')
+                logger.error('Some issue in server start.')
         else:
-            print('A server process is already running. Checking for the graph location in use....')
+            logger.info('A server process is already running. Checking for the graph location in use....')
             if server.conf.get('neo4j-server','org.neo4j.server.database.location') !=db_dump_location:
                 # set the name of the graph db dump location
                 try:
                     server.stop()
                     server.update_server_properties(database_location=db_dump_location)
                     server.start()
-                    print('neo4j server has been successfully started.')
+                    logger.info('neo4j server has been successfully started.')
                 except:
-                    print('Some issue in setting the db dump location. Defaulting to '+str(server.conf.get('neo4j-server','org.neo4j.server.database.location')))
+                    logger.error('Some issue in setting the db dump location. Defaulting to '+str(server.conf.get('neo4j-server','org.neo4j.server.database.location')))
                 
 
     @staticmethod
@@ -360,8 +364,8 @@ class LookupWordViewSet(viewsets.ViewSet):
         try:
             server.stop()
         except:
-            print(traceback.format_exc())    
-            print('error in stoping')
+            logger.error(traceback.format_exc())    
+            logger.error('error in stoping')
 
 
 
@@ -371,7 +375,7 @@ class LookupWordViewSet(viewsets.ViewSet):
             graph= Graph("http://"+settings.NEO4J_DATABASES['default']['USER']+":"+settings.NEO4J_DATABASES['default']['PASSWORD']+"@"+settings.NEO4J_DATABASES['default']['HOST']+":"+str(settings.NEO4J_DATABASES['default']['PORT'])+settings.NEO4J_DATABASES['default']['ENDPOINT'])
             return graph
         except:
-            print(traceback.format_exc())    
+            logger.error(traceback.format_exc())    
             return False
             
             
@@ -401,11 +405,11 @@ class LookupWordViewSet(viewsets.ViewSet):
         try:
             corpus_for_examples=query_parameters.getlist('corpus_to_use')[0]
         except :
-            print('Corpus_for_example not specified.')
+            logger.error('Corpus_for_example not specified.')
         try:
             definition=query_parameters.getlist('definition')[0]
         except :
-            print('Definition not specified.')
+            logger.error('Definition not specified.')
         server=None
         if word ==None:
             return Response('Some problem with the parameters pass with GET request')
@@ -415,8 +419,8 @@ class LookupWordViewSet(viewsets.ViewSet):
             graph=LookupWordViewSet.connect_to_neo()
         try:
             examples={}
-            q=r"match (n {name:'"+word.replace("'","\\\'")+"'})-[r:sentence]->(m) with r.index as rindex limit 10 match ()-[r1:sentence {index:rindex}]->() with r1 as sentence , r1.index as r1index, r1.orderi as r1orderi order by r1.orderi desc  return collect(sentence),r1index "
-            print q
+            q=r"match (n {name:'"+word.replace("'","\\\'")+"'})-[r:sentence]->(m) with r.index as rindex limit 1 match ()-[r1:sentence {index:rindex}]->() with r1 as sentence , r1.index as r1index, r1.orderi as r1orderi order by r1.orderi desc  return collect(sentence),r1index "
+            logger.info( q)
             results=graph.cypher.execute(q)
             sentences=[]
             for result in results:
@@ -436,6 +440,6 @@ class LookupWordViewSet(viewsets.ViewSet):
             examples['word']=word
             examples['examples']=sentences            
         except:
-            print(traceback.format_exc())
+            logger.error(traceback.format_exc())
         return Response(examples)
             
