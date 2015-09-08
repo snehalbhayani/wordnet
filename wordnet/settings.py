@@ -18,6 +18,7 @@ DATABASES = {
         'HOST': 'localhost',
         'PORT': '5432',
 }
+
 }
 
 NEO4J_DATABASES = {
@@ -125,7 +126,7 @@ TEMPLATE_DIRS = (
     # Don't forget to use absolute paths, not relative paths.
 )
 
-AUTHENTICATION_BACKENDS = ('neo4django.auth.backends.NodeModelBackend',)
+AUTHENTICATION_BACKENDS = ('django.contrib.auth.backends.ModelBackend',)
 INSTALLED_APPS = (
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -137,10 +138,11 @@ INSTALLED_APPS = (
     'snippets',
     'rest_framework',
     'activities', 
+    'wordgui',
     # Uncomment the next line to enable the admin:
-    # 'django.contrib.admin',
+    'django.contrib.admin',
     # Uncomment the next line to enable admin documentation:
-    # 'django.contrib.admindocs',
+    'django.contrib.admindocs',
 )
 DATABASE_ROUTERS = ['neo4django.utils.Neo4djangoIntegrationRouter']
 # A sample logging configuration. The only tangible logging
@@ -174,7 +176,7 @@ LOGGING = {
         'file':{
             'level': 'INFO',
             'class': 'logging.FileHandler',
-            'filename': 'mysite.log',
+            'filename': 'wordnet.log',
             'formatter': 'verbose'
         }
     },

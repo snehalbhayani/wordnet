@@ -1,19 +1,16 @@
 from py2neo import Node, Relationship, Graph, neo4j
 from py2neo.server import GraphServer
 from django.db import models
-from models import WordCard
 from rest_framework import status
 from rest_framework.decorators import list_route
 from rest_framework import viewsets
 from rest_framework.response import Response
 from rest_framework.renderers import JSONRenderer
-from serializers import WordCardSerializer
 from django.conf import settings
 from collections import OrderedDict
 import traceback
 import sys,inspect
 import staticpaths
-from pywsd.similarity import max_similarity as maxsim
 import nltk
 from pywsd import disambiguate
 import logging
@@ -49,7 +46,7 @@ class LookupWordRelationViewSet(viewsets.ViewSet):
 
     @api_marker_decorator
     @list_route(methods=['get'])
-    def find_similarity(self,request):
+    def word_similarity(self,request):
         """
         ENDPOINT:/v1/wordnet/find_similarity
         PARAMETERS:1.  <words> is a comma-separated pair of words which is of the form <start_word>,<end_word>.
@@ -101,7 +98,68 @@ class LookupWordRelationViewSet(viewsets.ViewSet):
         return Response(paths)
 
 
-        
+    @api_marker_decorator
+    @list_route(methods=['get'])
+    def sense_similarity(self,request):
+        """
+        ENDPOINT:/v1/wordnet/find_similarity
+        PARAMETERS:1.  <words> is a comma-separated pair of words which is of the form <start_word>,<end_word>.
+                   2.  <relationstouse> specifies the relations which are to be used for finding the relation of the second word with respect to the first word. Multiple relation types are specified by using the underscore character as the concatenating character. For example, to look for relations between the two words using only synonyms and antonyms, we need to specify the value of relationstouse as 'synonym_antonym'. If we want to use all of the available relation types for finding the relation between the two words, we specify the value of relationstouse as 'all'. Any of the relation types specified in the first API can be used for finding the relation between the two words.
+                   3. <how_many> is the number of similarity paths to be looked up. 
+
+        """
+        words=str(request.GET['words']).split(',')
+        start_word=words[0]
+        end_word=words[1]
+        arg3=request.GET['relationstouse']
+        how_many_similarities=str(request.GET['how_many'])
+        rels_to_use=None
+        if arg3 is not None and str(arg3) == "all" :
+            rels_to_use='*'
+        elif arg3 is not None and str(arg3) != "" :
+            rels_to_use=":"+arg3.replace('_','|:')+"*"
+        if start_word ==None or end_word==None:
+            logger.info("Please specify both the words.")
+            return False
+        paths=[]
+        if request.method=='GET':
+            server=LookupWordViewSet.get_neo_server()
+            LookupWordViewSet.start_neo('/home/snehal/data/sensegraph.db',server)     
+            graph=LookupWordViewSet.connect_to_neo()        
+            if rels_to_use is not None :
+                q=r"match (n:word {name:'"+start_word.replace("'","\\\'")+"'}), (m:word {name:'"+end_word.replace("'","\\\'")+"'}),(n)-[r1:synonym|:derivation]->(k1:sense), (m)-[r2:synonym|:derivation]->(k2:sense), p=shortestPath((k1)-[r:hypernym|:hyponym|:entailment|:part_meronym|:substance_meronym|:part_holonym|:substance_holonym|:antonym|:synonym*]-(k2)) with nodes(p) as pnodes, k1 , k2,p return k1,length(pnodes),pnodes,relationships(p),k2 order by length(pnodes) asc limit "+str(how_many_similarities)
+            else:
+                logger.info('Problem with the valdity of the input parameters. Please contact the programmer.')
+            logger.info (q)
+            results=graph.cypher.execute(q)
+            response_dict={}
+            response_dict['start_word']=start_word
+            response_dict['end_word']=end_word
+            paths=[]
+            for result in results:
+                path={}                
+                rels=result[3]
+                for rel in rels:
+                    rel_type=rel.type
+                    if 'definition' in rel.start_node.properties:
+                        start_node=rel.start_node.properties['definition']
+                    elif 'name' in rel.start_node.properties:
+                        start_node=rel.start_node.properties['name']                        
+                    if 'definition' in rel.end_node.properties:
+                        end_node=rel.end_node.properties['definition']
+                    elif 'name' in rel.end_node.properties:
+                        end_node=rel.end_node.properties['name']                        
+                        
+                    if 'relation' not in path:
+                        path['relation']=[]
+                    path['relation'].append({'from':start_node.replace("'","\\\'"),'to':end_node.replace("'","\\\'"), 'relation':rel_type.replace("'","\\\'")})
+                    path['starting_sense']=result[0].properties['definition']
+                    path['ending_sense']=result[4].properties['definition']
+                    
+                paths.append(path)
+            response_dict['paths']=paths
+        return Response(response_dict)
+
 
     @staticmethod  
     def connect_to_neo():
@@ -138,7 +196,6 @@ class LookupWordViewSet(viewsets.ViewSet):
                 dict_of_details=(LookupWordViewSet.find_and_group_by_relation(word,construction[:-1]))
             else:
                 dict_of_details=(LookupWordViewSet.find_and_group_by_relation(word,''))
-            wordcard = WordCard(word=word,dictdetails=dict_of_details)
             logger.info (dict_of_details)
         else:
             logger.error('Http method not supported in this version.')
@@ -167,7 +224,6 @@ class LookupWordViewSet(viewsets.ViewSet):
                 dict_of_details=(LookupWordViewSet.find_and_group_by_definition(word,construction[:-1]))
             else:
                 dict_of_details=(LookupWordViewSet.find_and_group_by_definition(word,''))
-                wordcard = WordCard(word=word,dictdetails=dict_of_details)
         else:
             logger.error('Http method not supported in this version.')
         return Response(dict_of_details)
@@ -256,8 +312,6 @@ class LookupWordViewSet(viewsets.ViewSet):
                 for rel in rels_list:
                     construction=construction+":"+rel+'|'
                 dict_of_details=(LookupWordViewSet.find_and_group_by_relation(word,construction[:-1]))
-                wordcard = WordCard(word=word,dictdetails=dict_of_details)
-                logger.info (wordcard.dictdetails)
 #                renderedjson = JSONRenderer().render(serializer.data)
             logger.info (dict_of_details)
         else:

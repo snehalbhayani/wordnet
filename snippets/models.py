@@ -6,7 +6,7 @@ from jsonfield import JSONField
 
 class WordCard(snippetmodels.Model):
     word=snippetmodels.CharField(max_length=100)
-    dictdetails=snippetmodels.CharField()
+    dictdetails=snippetmodels.CharField(max_length=100)
 #    meanings=snippetmodels.CharField(max_length=500)
 #    synonyms=snippetmodels.CharField(max_length=500)
 #    antonyms=snippetmodels.CharField(max_length=500)

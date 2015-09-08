@@ -14,4 +14,6 @@ urlpatterns = patterns('',
     url(r'^lookup/', views.LookupWord),
     url(r'^', include('snippets.urls')),
     url(r'^', include('activities.urls')),
+    url(r'^', include('wordgui.urls')),
+    url(r'^admin/', include(admin.site.urls)),
 )
