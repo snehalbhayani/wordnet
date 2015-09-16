@@ -1,6 +1,5 @@
 from django.shortcuts import render
 from forms import WordForm
-from models import GetTheWordDetails
 import words
 def WordView(request):
     template_name = 'form_for_word.html'

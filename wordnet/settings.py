@@ -137,7 +137,7 @@ INSTALLED_APPS = (
     'lookupword',   
     'snippets',
     'rest_framework',
-    'activities', 
+    'searchapi', 
     'wordgui',
     # Uncomment the next line to enable the admin:
     'django.contrib.admin',
@@ -194,4 +194,12 @@ REST_FRAMEWORK = {
         'rest_framework.renderers.BrowsableAPIRenderer',
     )
 }
+
+
+ElasticUtils = {
+'ES_URLS':['http://localhost:9200']
+
+
+}
+
 
