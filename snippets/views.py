@@ -410,6 +410,17 @@ class LookupWordViewSet(viewsets.ViewSet):
         PARAMETERS:1.   <word> is the specified word whose examples we are looking for. 
                    2.   <corpus_to_use> is the corpus, specified, from which we want to extract examples for the specified word.
                    3.   <definition> is an optional parameter which is used to seek examples which have the specified word used in only a particular sense. TODO.
+        SAMPLE OUTPUT for v1/wordnet/find_examples/?word=look&corpus_to_use=brown :
+        {
+    "the act of directing the eyes toward something and perceiving it visually": {
+        "looking": [
+            "his camera does his looking for him"
+        ],
+        "look": [
+            "his look was fixed on her eyes"
+        ]
+        }
+    }
         """
         query_parameters=request.GET
         logger.info( query_parameters)
@@ -550,7 +561,7 @@ class LookupWordViewSet(viewsets.ViewSet):
         if word ==None:
             return Response('Some problem with the parameters pass with GET request')
         else:
-            server=LookupWordViewSet.get_neo_server()
+            server=LookupWordViewSet.get_neos_erver()
             LookupWordViewSet.start_neo('/home/snehal/data/examplesentencesgraph.db',server)
             graph=LookupWordViewSet.connect_to_neo()
         try:
@@ -563,7 +574,7 @@ class LookupWordViewSet(viewsets.ViewSet):
                 relations=result[0]
                 sentence=''
                 for relation in relations:
-                    sentence=relation.start_node.properties['name']+' '+sentence
+4 5                   sentence=relation.start_node.properties['name']+' '+sentence
                 contexts=disambiguate(sentence)
                 for context in contexts:
                     if context[0]==word:
