@@ -182,6 +182,44 @@ class LookupWordViewSet(viewsets.ViewSet):
         DESCRIPTION: This API returns related words, grouped by the various relation types found for the specified word.
         PARAMETERS:1.  <word> is the specified word. Wordnet supports common word usages like 'use up', 'give in', etc. Hence such usages, involving spaces should be transformed into a single string, with each space replace by an underscore. For example, the usage 'use up' should instead be looked up by specifying the value of the parameter word as 'use_up'.
                    2.  <lookup> specifies the relations which are to be used for finding the relation of the second word with respect to the first word. Multiple relation types are specified by using the underscore('_') as the concatenating character. For example, to look for relations between the two words using only synonyms and antonyms, we need to specify the value of lookup as 'synonym_antonym'. If we want to use all of the available relation types for finding the relation between the two words, we specify the value of lookup as 'all'. Any of the relation types specified in the first API can be used for finding the relation between the two words.
+        
+        SAMPLE OUTPUT for v1/wordnet/group_by_relation/?word=eat&lookup=synonym : {
+    "pronunciation_url": "https://ssl.gstatic.com/dictionary/static/sounds/de/0/eat.mp3",
+    "word": "eat",
+    "synonym": {
+        "take in food; used of animals only": {
+            "part_of_speech": "v",
+            "words": [
+                "feed"
+            ]
+        },
+        "cause to deteriorate due to the action of water, air, or an acid": {
+            "part_of_speech": "v",
+            "words": [
+                "rust",
+                "corrode"
+            ]
+        },
+        "use up (resources or materials)": {
+            "part_of_speech": "v",
+            "words": [
+                "wipe_out",
+                "run_through",
+                "exhaust",
+                "deplete",
+                "use_up",
+                "eat_up",
+                "consume"
+            ]
+        },
+        "worry or cause anxiety in a persistent way": {
+            "part_of_speech": "v",
+            "words": [
+                "eat_on"
+            ]
+        }
+    }
+}                   
         """
         if request.method=='GET':
             word=request.GET['word']
@@ -209,6 +247,50 @@ class LookupWordViewSet(viewsets.ViewSet):
         DESCRIPTION: This API returns related words, grouped by the various definitions found for the specified word. 
         PARAMETERS:1.  <word> is the specified word. Wordnet supports common word usages like 'use up', 'give in', etc. Hence such usages, involving spaces should be transformed into a single string, with each space replace by an underscore. For example, the usage 'use up' should instead be looked up by specifying the value of the parameter word as 'use_up'.
                    2.  <lookup> specifies the relations which are to be used for finding the relation of the second word with respect to the first word. Multiple relation types are specified by using the underscore('_') as the concatenating character. For example, to look for relations between the two words using only synonyms and antonyms, we need to specify the value of lookup as 'synonym_antonym'. If we want to use all of the available relation types for finding the relation between the two words, we specify the value of lookup as 'all'. Any of the relation types specified in the first API can be used for finding the relation between the two words.
+        SAMPLE OUTPUT for v1/wordnet/group_by_definition/?word=eat&lookup=synonym : 
+    {
+    "cause to deteriorate due to the action of water, air, or an acid": {
+        "synonym": {
+            "part_of_speech": "v",
+            "words": [
+                "rust",
+                "corrode"
+            ]
+        }
+    },
+    "word": "eat",
+    "worry or cause anxiety in a persistent way": {
+        "synonym": {
+            "part_of_speech": "v",
+            "words": [
+                "eat_on"
+            ]
+        }
+    },
+    "use up (resources or materials)": {
+        "synonym": {
+            "part_of_speech": "v",
+            "words": [
+                "wipe_out",
+                "run_through",
+                "exhaust",
+                "deplete",
+                "use_up",
+                "eat_up",
+                "consume"
+            ]
+        }
+    },
+    "take in food; used of animals only": {
+        "synonym": {
+            "part_of_speech": "v",
+            "words": [
+                "feed"
+            ]
+        }
+    },
+    "pronunciation_url": "https://ssl.gstatic.com/dictionary/static/sounds/de/0/eat.mp3"
+}
         """
 
         if request.method=='GET':
